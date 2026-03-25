@@ -31,6 +31,36 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Select Xcode 16+
+        run: |
+          set -euo pipefail
+
+          best_app=""
+          best_version=""
+
+          for app in /Applications/Xcode*.app; do
+            [[ -d "$app" ]] || continue
+            version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+            major="${version%%.*}"
+
+            if (( major < 16 )); then
+              continue
+            fi
+
+            if [[ -z "$best_version" ]] || [[ "$(printf '%s\n%s\n' "$best_version" "$version" | sort -V | tail -n1)" == "$version" ]]; then
+              best_version="$version"
+              best_app="$app"
+            fi
+          done
+
+          if [[ -z "$best_app" ]]; then
+            echo "No Xcode 16+ installation found on this runner." >&2
+            exit 1
+          fi
+
+          echo "DEVELOPER_DIR=$best_app/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Selected Xcode $best_version at $best_app"
+
       - name: Resolve release version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
