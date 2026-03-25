@@ -102,12 +102,19 @@ final class AppModel: ObservableObject {
     @Published var lastBackend = ""
     @Published var lastKokoroDevice = ""
     @Published var isGenerating = false
+    @Published var generationProgress = 0.0
+    @Published var progressTitle = ""
+    @Published var progressDetail = ""
 
     private let defaults = UserDefaults.standard
     private let keychain = KeychainStore(service: "com.rushikeshpatil.AudioLocal")
     private let geminiClient = GeminiTTSClient()
     private let kokoroSynthesizer = KokoroSynthesizer()
     private let storageCoordinator = AudioStorageCoordinator()
+    private var progressTickerTask: Task<Void, Never>?
+    private var currentGenerationPhase: GenerationPhase = .preparing
+    private var generationEstimate = GenerationEstimate(preparing: 1.0, synthesizing: 8.0, saving: 2.0)
+    private var phaseStartDate = Date.now
 
     private enum Keys {
         static let articleTitle = "draft.articleTitle"
@@ -137,6 +144,37 @@ final class AppModel: ObservableObject {
         saveLocationMode = SaveLocationMode(rawValue: defaults.string(forKey: Keys.saveLocationMode) ?? "") ?? .managedInbox
         exportFormat = AudioExportFormat(rawValue: defaults.string(forKey: Keys.exportFormat) ?? "") ?? .m4b
         customSaveDirectory = defaults.string(forKey: Keys.customSaveDirectory) ?? ""
+    }
+
+    var shouldShowProgress: Bool {
+        isGenerating || generationProgress > 0
+    }
+
+    var usesKokoroInCurrentMode: Bool {
+        providerMode != .geminiOnly
+    }
+
+    var isKokoroGPUActive: Bool {
+        let device = lastKokoroDevice.uppercased()
+        return device == "MPS" || device == "CUDA"
+    }
+
+    var kokoroDeviceBadgeText: String {
+        if lastKokoroDevice.isEmpty {
+            return "Kokoro device: auto"
+        }
+
+        return isKokoroGPUActive ? "GPU on: \(lastKokoroDevice)" : "CPU fallback: \(lastKokoroDevice)"
+    }
+
+    var kokoroDeviceDetail: String {
+        if lastKokoroDevice.isEmpty {
+            return "Waiting for the first Kokoro run. The runtime will prefer MPS, then fall back to CPU if needed."
+        }
+
+        return isKokoroGPUActive
+            ? "\(lastKokoroDevice) acceleration is active for the last Kokoro generation."
+            : "\(lastKokoroDevice) is active for the last Kokoro generation."
     }
 
     var canGenerate: Bool {
@@ -195,13 +233,19 @@ final class AppModel: ObservableObject {
         lastSavedPath = ""
         lastBackend = ""
         lastKokoroDevice = ""
+        startProgressTracking()
 
-        defer { isGenerating = false }
+        defer {
+            isGenerating = false
+            stopProgressTicker()
+        }
 
         do {
             let itemName = makeItemName()
             let destination = try selectedStorageDestination()
             let result: GeneratedAudio
+
+            transitionProgress(to: .synthesizing)
 
             switch providerMode {
             case .automatic:
@@ -212,6 +256,7 @@ final class AppModel: ObservableObject {
                 result = try await synthesizeWithKokoro()
             }
 
+            transitionProgress(to: .saving)
             statusMessage = saveLocationMode == .managedInbox
                 ? "Compressing and copying audio to Audiobookshelf Inbox..."
                 : "Compressing and saving audio to the selected folder..."
@@ -224,7 +269,9 @@ final class AppModel: ObservableObject {
             lastSavedPath = outputURL.path
             lastBackend = result.backend
             statusMessage = "Saved \(outputURL.lastPathComponent) via \(result.backend)."
+            completeProgressTracking(with: outputURL)
         } catch {
+            resetProgressTracking()
             statusMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
@@ -257,6 +304,64 @@ final class AppModel: ObservableObject {
     private struct GeneratedAudio {
         let wavData: Data
         let backend: String
+    }
+
+    private enum GenerationPhase {
+        case preparing
+        case synthesizing
+        case saving
+
+        var title: String {
+            switch self {
+            case .preparing:
+                return "Preparing"
+            case .synthesizing:
+                return "Generating audio"
+            case .saving:
+                return "Saving file"
+            }
+        }
+    }
+
+    private struct GenerationEstimate {
+        let preparing: TimeInterval
+        let synthesizing: TimeInterval
+        let saving: TimeInterval
+
+        func duration(for phase: GenerationPhase) -> TimeInterval {
+            switch phase {
+            case .preparing:
+                return preparing
+            case .synthesizing:
+                return synthesizing
+            case .saving:
+                return saving
+            }
+        }
+
+        func progressRange(for phase: GenerationPhase) -> ClosedRange<Double> {
+            switch phase {
+            case .preparing:
+                return 0.02...0.08
+            case .synthesizing:
+                return 0.08...0.84
+            case .saving:
+                return 0.84...0.98
+            }
+        }
+
+        func remainingTime(after elapsed: TimeInterval, in phase: GenerationPhase) -> TimeInterval {
+            let remainingCurrent = max(duration(for: phase) - elapsed, 0)
+
+            switch phase {
+            case .preparing:
+                return remainingCurrent + synthesizing + saving
+            case .synthesizing:
+                return remainingCurrent + saving
+            case .saving:
+                return remainingCurrent
+            }
+        }
     }
 
     private func synthesizeAutomatically() async throws -> GeneratedAudio {
@@ -307,6 +412,106 @@ final class AppModel: ObservableObject {
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let timestamp = formatter.string(from: .now)
         return "\(safeTitle.isEmpty ? "article" : safeTitle)-\(timestamp)"
+    }
+
+    private func startProgressTracking() {
+        progressTickerTask?.cancel()
+        generationEstimate = estimateGenerationDuration()
+        currentGenerationPhase = .preparing
+        phaseStartDate = .now
+        generationProgress = generationEstimate.progressRange(for: .preparing).lowerBound
+        progressTitle = GenerationPhase.preparing.title
+        progressDetail = "About \(Self.formatDuration(generationEstimate.preparing + generationEstimate.synthesizing + generationEstimate.saving)) remaining"
+        refreshProgressTracking()
+
+        progressTickerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await MainActor.run {
+                    self?.refreshProgressTracking()
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
+    private func transitionProgress(to phase: GenerationPhase) {
+        currentGenerationPhase = phase
+        phaseStartDate = .now
+        generationProgress = max(generationProgress, generationEstimate.progressRange(for: phase).lowerBound)
+        progressTitle = phase.title
+        refreshProgressTracking()
+    }
+
+    private func completeProgressTracking(with outputURL: URL) {
+        generationProgress = 1.0
+        progressTitle = "Completed"
+        progressDetail = "Saved \(outputURL.lastPathComponent)"
+    }
+
+    private func resetProgressTracking() {
+        generationProgress = 0.0
+        progressTitle = ""
+        progressDetail = ""
+    }
+
+    private func stopProgressTicker() {
+        progressTickerTask?.cancel()
+        progressTickerTask = nil
+    }
+
+    private func refreshProgressTracking() {
+        let elapsed = max(Date.now.timeIntervalSince(phaseStartDate), 0)
+        let phaseRange = generationEstimate.progressRange(for: currentGenerationPhase)
+        let phaseDuration = max(generationEstimate.duration(for: currentGenerationPhase), 0.5)
+        let phaseFraction = min(elapsed / phaseDuration, 0.95)
+        let trackedProgress = phaseRange.lowerBound + ((phaseRange.upperBound - phaseRange.lowerBound) * phaseFraction)
+        generationProgress = max(generationProgress, trackedProgress)
+        progressTitle = currentGenerationPhase.title
+
+        let remainingTime = generationEstimate.remainingTime(after: elapsed, in: currentGenerationPhase)
+        progressDetail = remainingTime > 1
+            ? "About \(Self.formatDuration(remainingTime)) remaining"
+            : "Finishing up..."
+    }
+
+    private func estimateGenerationDuration() -> GenerationEstimate {
+        let characterCount = max(articleBody.count, 1)
+
+        let synthesisBase: TimeInterval
+        switch providerMode {
+        case .kokoroOnly, .automatic:
+            let speedFactor = max(0.75, 1.15 - ((kokoroSpeed - 1.0) * 0.65))
+            synthesisBase = (4.5 + (Double(characterCount) * 0.0024)) * speedFactor
+        case .geminiOnly:
+            synthesisBase = 3.0 + (Double(characterCount) * 0.0012)
+        }
+
+        let saveBase: TimeInterval = saveLocationMode == .managedInbox ? 4.0 : 1.25
+        let formatMultiplier: Double
+        switch exportFormat {
+        case .m4b:
+            formatMultiplier = 1.15
+        case .m4a:
+            formatMultiplier = 1.0
+        case .wav:
+            formatMultiplier = saveLocationMode == .managedInbox ? 2.8 : 1.35
+        }
+
+        let preparing = 0.8
+        let synthesizing = min(max(synthesisBase, 4.0), 240.0)
+        let saving = min(max((saveBase + (Double(characterCount) / 18000.0)) * formatMultiplier, 1.0), 120.0)
+        return GenerationEstimate(preparing: preparing, synthesizing: synthesizing, saving: saving)
+    }
+
+    private static func formatDuration(_ duration: TimeInterval) -> String {
+        let rounded = max(Int(duration.rounded()), 1)
+        if rounded < 60 {
+            return "\(rounded)s"
+        }
+
+        let minutes = rounded / 60
+        let seconds = rounded % 60
+        return seconds == 0 ? "\(minutes)m" : "\(minutes)m \(seconds)s"
     }
 
     private func saveAPIKey(_ value: String) {

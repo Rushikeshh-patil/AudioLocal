@@ -33,13 +33,14 @@ struct ContentView: View {
 
             Spacer()
 
-            if !model.lastBackend.isEmpty {
-                Text(model.lastBackend)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(chipBackground, in: Capsule())
+            HStack(spacing: 8) {
+                if model.usesKokoroInCurrentMode || !model.lastKokoroDevice.isEmpty {
+                    statusChip(model.kokoroDeviceBadgeText, highlighted: model.isKokoroGPUActive)
+                }
+
+                if !model.lastBackend.isEmpty {
+                    statusChip(model.lastBackend)
+                }
             }
         }
     }
@@ -100,6 +101,24 @@ struct ContentView: View {
                 Text("\(model.articleBody.count) chars")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if model.shouldShowProgress {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(model.progressTitle)
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        if !model.progressDetail.isEmpty {
+                            Text(model.progressDetail)
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    ProgressView(value: model.generationProgress, total: 1.0)
+                        .controlSize(.small)
+                }
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -183,7 +202,7 @@ struct ContentView: View {
                 }
 
                 inspectorRow(label: "Device") {
-                    Text(model.lastKokoroDevice.isEmpty ? "Auto: prefer MPS, then CPU fallback" : model.lastKokoroDevice)
+                    Text(model.kokoroDeviceDetail)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -279,6 +298,20 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             content()
         }
+    }
+
+    private func statusChip(_ title: String, highlighted: Bool = false) -> some View {
+        let tint = highlighted ? Color(nsColor: .systemGreen) : Color.secondary
+
+        return Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(highlighted ? tint.opacity(colorScheme == .dark ? 0.18 : 0.12) : chipBackground)
+            )
     }
 
     private var editorBackground: Color {

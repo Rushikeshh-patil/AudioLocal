@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.3 - 2026-03-25
+
+- Fixed `WAV` export when saving locally or to a custom folder
+- Added a visible Kokoro device badge in the main header so GPU usage is easier to confirm
+- Added a generation progress bar with estimated remaining time for synthesis and save phases
+
+## 1.0.2 - 2026-03-25
+
+- Added selectable export formats: `M4B`, `M4A`, and `WAV`
+- Updated GitHub Actions workflows to Node 24-based action versions
+
 ## 1.0.1 - 2026-03-25
 
 - Bundled Kokoro runtime and prefetched model cache in packaged downloads

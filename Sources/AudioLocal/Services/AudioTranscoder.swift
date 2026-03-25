@@ -20,6 +20,9 @@ struct AudioTranscoder: Sendable {
 
     func exportSpeechAudio(at sourceURL: URL, to destinationURL: URL, format: AudioExportFormat) throws {
         if format == .wav {
+            if sourceURL.standardizedFileURL == destinationURL.standardizedFileURL {
+                return
+            }
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 try FileManager.default.removeItem(at: destinationURL)
             }
