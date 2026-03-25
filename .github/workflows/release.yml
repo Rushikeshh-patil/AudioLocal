@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode 16+
         run: |
@@ -83,7 +83,7 @@ jobs:
         run: ./scripts/package_release.sh "$APP_VERSION" "$APP_BUILD_NUMBER" "${{ matrix.architecture }}"
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: AudioLocal-macOS-${{ matrix.artifact_label }}-${{ env.APP_VERSION }}
           path: |
@@ -101,7 +101,7 @@ jobs:
 
     steps:
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: release-artifacts
           pattern: AudioLocal-macOS-*
