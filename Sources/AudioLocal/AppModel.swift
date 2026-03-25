@@ -89,6 +89,10 @@ final class AppModel: ObservableObject {
         didSet { defaults.set(saveLocationMode.rawValue, forKey: Keys.saveLocationMode) }
     }
 
+    @Published var exportFormat: AudioExportFormat {
+        didSet { defaults.set(exportFormat.rawValue, forKey: Keys.exportFormat) }
+    }
+
     @Published var customSaveDirectory: String {
         didSet { defaults.set(customSaveDirectory, forKey: Keys.customSaveDirectory) }
     }
@@ -115,6 +119,7 @@ final class AppModel: ObservableObject {
         static let kokoroVoice = "settings.kokoroVoice"
         static let kokoroSpeed = "settings.kokoroSpeed"
         static let saveLocationMode = "settings.saveLocationMode"
+        static let exportFormat = "settings.exportFormat"
         static let customSaveDirectory = "settings.customSaveDirectory"
     }
 
@@ -130,6 +135,7 @@ final class AppModel: ObservableObject {
         let storedSpeed = defaults.object(forKey: Keys.kokoroSpeed) as? Double
         kokoroSpeed = storedSpeed ?? 1.0
         saveLocationMode = SaveLocationMode(rawValue: defaults.string(forKey: Keys.saveLocationMode) ?? "") ?? .managedInbox
+        exportFormat = AudioExportFormat(rawValue: defaults.string(forKey: Keys.exportFormat) ?? "") ?? .m4b
         customSaveDirectory = defaults.string(forKey: Keys.customSaveDirectory) ?? ""
     }
 
@@ -160,22 +166,22 @@ final class AppModel: ObservableObject {
     var saveLocationPreview: String {
         switch saveLocationMode {
         case .managedInbox:
-            return "\(VolumeManager.inboxRootPath)/<title-timestamp>/<title-timestamp>.\(AudioTranscoder.outputExtension)"
+            return "\(VolumeManager.inboxRootPath)/<title-timestamp>/<title-timestamp>.\(exportFormat.filenameExtension)"
         case .customFolder:
             let basePath = trimmedCustomSaveDirectory
             guard !basePath.isEmpty else {
                 return "Choose a folder to save generated audio."
             }
-            return "\(basePath)/<title-timestamp>/<title-timestamp>.\(AudioTranscoder.outputExtension)"
+            return "\(basePath)/<title-timestamp>/<title-timestamp>.\(exportFormat.filenameExtension)"
         }
     }
 
     var saveLocationDetail: String {
         switch saveLocationMode {
         case .managedInbox:
-            return "Staged locally, compressed to AAC `.m4b`, then copied to the SMB Audiobookshelf Inbox. The app will try to mount \(VolumeManager.shareURLString) if needed."
+            return "Staged locally, \(exportFormat.processingDescription), then copied to the SMB Audiobookshelf Inbox. The app will try to mount \(VolumeManager.shareURLString) if needed."
         case .customFolder:
-            return "Staged locally, compressed to AAC `.m4b`, then copied into the folder you choose. Each export still gets its own subfolder."
+            return "Staged locally, \(exportFormat.processingDescription), then copied into the folder you choose. Each export still gets its own subfolder."
         }
     }
 
@@ -212,7 +218,8 @@ final class AppModel: ObservableObject {
             let outputURL = try await storageCoordinator.saveAudio(
                 result.wavData,
                 itemName: itemName,
-                destination: destination
+                destination: destination,
+                format: exportFormat
             )
             lastSavedPath = outputURL.path
             lastBackend = result.backend

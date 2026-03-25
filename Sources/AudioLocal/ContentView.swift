@@ -26,7 +26,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Article Audio")
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
-                Text("Generate speech and save the final `.m4b` to Audiobookshelf or any folder.")
+                Text("Generate speech and save the final audio to Audiobookshelf or any folder.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -219,6 +219,19 @@ struct ContentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                inspectorRow(label: "Format") {
+                    Picker("Output format", selection: $model.exportFormat) {
+                        ForEach(AudioExportFormat.allCases) { format in
+                            Text(format.title).tag(format)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(model.exportFormat.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 if model.saveLocationMode == .customFolder {
                     Button(model.saveLocationButtonTitle) {

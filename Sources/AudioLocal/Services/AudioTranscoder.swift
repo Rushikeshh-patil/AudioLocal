@@ -18,9 +18,15 @@ struct AudioTranscoder: Sendable {
         }
     }
 
-    static let outputExtension = "m4b"
+    func exportSpeechAudio(at sourceURL: URL, to destinationURL: URL, format: AudioExportFormat) throws {
+        if format == .wav {
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            return
+        }
 
-    func transcodeSpeechWAV(at sourceURL: URL, to destinationURL: URL) throws {
         let executable = "/usr/bin/afconvert"
         guard FileManager.default.isExecutableFile(atPath: executable) else {
             throw TranscodeError.toolMissing
@@ -29,15 +35,7 @@ struct AudioTranscoder: Sendable {
         let stderrPipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = [
-            sourceURL.path,
-            "-o", destinationURL.path,
-            "-f", "m4bf",
-            "-d", "aac",
-            "-b", "48000",
-            "-q", "127",
-            "-s", "3"
-        ]
+        process.arguments = arguments(for: format, sourceURL: sourceURL, destinationURL: destinationURL)
         process.standardError = stderrPipe
         process.standardOutput = Pipe()
 
@@ -59,6 +57,34 @@ struct AudioTranscoder: Sendable {
 
         guard FileManager.default.fileExists(atPath: destinationURL.path) else {
             throw TranscodeError.outputMissing
+        }
+    }
+
+    private func arguments(for format: AudioExportFormat, sourceURL: URL, destinationURL: URL) -> [String] {
+        switch format {
+        case .m4b:
+            return [
+                sourceURL.path,
+                destinationURL.path,
+                "-f", "m4bf",
+                "-d", "aac",
+                "-b", "48000",
+                "-q", "127",
+                "-s", "3",
+                "--media-kind", "Audiobook"
+            ]
+        case .m4a:
+            return [
+                sourceURL.path,
+                destinationURL.path,
+                "-f", "m4af",
+                "-d", "aac",
+                "-b", "48000",
+                "-q", "127",
+                "-s", "3"
+            ]
+        case .wav:
+            return [sourceURL.path, destinationURL.path]
         }
     }
 }

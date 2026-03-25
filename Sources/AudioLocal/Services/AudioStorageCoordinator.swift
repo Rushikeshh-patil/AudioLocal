@@ -34,7 +34,8 @@ struct AudioStorageCoordinator: Sendable {
     func saveAudio(
         _ wavData: Data,
         itemName: String,
-        destination: Destination = .managedInbox
+        destination: Destination = .managedInbox,
+        format: AudioExportFormat = .m4b
     ) async throws -> URL {
         try await Task.detached(priority: .utility) {
             let fileManager = FileManager.default
@@ -50,22 +51,22 @@ struct AudioStorageCoordinator: Sendable {
 
             let baseDirectory = try await resolveBaseDirectory(for: destination)
             let stagedFileURL = stagingDirectory.appendingPathComponent(itemName).appendingPathExtension("wav")
-            let compressedFileURL = stagingDirectory
+            let exportedFileURL = stagingDirectory
                 .appendingPathComponent(itemName)
-                .appendingPathExtension(AudioTranscoder.outputExtension)
+                .appendingPathExtension(format.filenameExtension)
             try wavData.write(to: stagedFileURL, options: .atomic)
-            try transcoder.transcodeSpeechWAV(at: stagedFileURL, to: compressedFileURL)
+            try transcoder.exportSpeechAudio(at: stagedFileURL, to: exportedFileURL, format: format)
 
             let itemDirectory = baseDirectory.appendingPathComponent(itemName, isDirectory: true)
             try fileManager.createDirectory(at: itemDirectory, withIntermediateDirectories: true)
 
             let destinationURL = itemDirectory
                 .appendingPathComponent(itemName)
-                .appendingPathExtension(AudioTranscoder.outputExtension)
+                .appendingPathExtension(format.filenameExtension)
             if fileManager.fileExists(atPath: destinationURL.path) {
                 try fileManager.removeItem(at: destinationURL)
             }
-            try fileManager.copyItem(at: compressedFileURL, to: destinationURL)
+            try fileManager.copyItem(at: exportedFileURL, to: destinationURL)
             return destinationURL
         }.value
     }

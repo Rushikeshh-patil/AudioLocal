@@ -1,6 +1,6 @@
 # AudioLocal
 
-Lightweight native macOS app for turning pasted article text into compressed `.m4b` audiobook files.
+Lightweight native macOS app for turning pasted article text into audiobook or audio files.
 
 By default it saves to:
 
@@ -22,7 +22,7 @@ If the default SMB volume is not mounted, the app tries to open `smb://100.73.8.
 - Gemini TTS via the Gemini API
 - Gemini is optional instead of required
 - Switchable save target: Audiobookshelf Inbox or any custom folder
-- Saves the final file as AAC `.m4b`
+- Choose the final export format: `.m4b`, `.m4a`, or `.wav`
 - Reveals the generated file in Finder
 - Buildable into a normal `.app`, `.zip`, and `.dmg` for GitHub releases
 
@@ -55,7 +55,7 @@ AudioLocal supports two save modes:
 
 `/chosen/path/my-article-20260325-141500/my-article-20260325-141500.m4b`
 
-The app stages the audio locally first, compresses it to AAC `.m4b`, and only then copies the final file to the destination. That keeps the UI responsive even when the final location is on a slow network share.
+The app stages the audio locally first, exports it in the selected format, and only then copies the final file to the destination. That keeps the UI responsive even when the final location is on a slow network share.
 
 ## Default runtime
 
