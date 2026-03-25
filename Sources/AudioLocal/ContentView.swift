@@ -1,0 +1,298 @@
+import SwiftUI
+
+struct ContentView: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HSplitView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                composerCard
+                editorCard
+            }
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            inspectorCard
+                .frame(minWidth: 320, idealWidth: 340, maxWidth: 360, maxHeight: .infinity, alignment: .top)
+        }
+        .padding(20)
+        .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Article Audio")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                Text("Generate speech and save the final `.m4b` to Audiobookshelf or any folder.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if !model.lastBackend.isEmpty {
+                Text(model.lastBackend)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(chipBackground, in: Capsule())
+            }
+        }
+    }
+
+    private var composerCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Title")
+                    .font(.headline)
+                TextField("Article title", text: $model.articleTitle)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Engine")
+                    .font(.headline)
+                Picker("Provider", selection: $model.providerMode) {
+                    ForEach(AppModel.ProviderMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 360)
+            }
+
+            HStack(alignment: .center, spacing: 12) {
+                HStack(spacing: 12) {
+                    Button {
+                        Task {
+                            await model.generateAudio()
+                        }
+                    } label: {
+                        HStack {
+                            if model.isGenerating {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text(model.isGenerating ? "Generating..." : "Create Audio File")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!model.canGenerate || model.isGenerating)
+                    .keyboardShortcut(.defaultAction)
+
+                    Button("Reveal in Finder") {
+                        model.revealLastFile()
+                    }
+                    .disabled(model.lastSavedPath.isEmpty)
+                }
+
+                Spacer()
+
+                Text("\(model.articleBody.count) chars")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.statusMessage)
+                    .font(.subheadline.weight(.medium))
+
+                if !model.lastSavedPath.isEmpty {
+                    Text(model.lastSavedPath)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .cardStyle(colorScheme: colorScheme)
+    }
+
+    private var editorCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Text")
+                    .font(.headline)
+                Spacer()
+                Text("Scrollable editor")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            TextEditor(text: $model.articleBody)
+                .font(.system(size: 14, weight: .regular, design: .monospaced))
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(editorBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: 1)
+                )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .layoutPriority(1)
+        .cardStyle(colorScheme: colorScheme)
+    }
+
+    private var inspectorCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Settings")
+                .font(.headline)
+
+            settingsSection(title: "Gemini") {
+                SecureField("Gemini API key", text: $model.geminiAPIKey)
+                    .textFieldStyle(.roundedBorder)
+
+                inspectorRow(label: "Model") {
+                    TextField("Gemini model", text: $model.geminiModel)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                inspectorRow(label: "Voice") {
+                    Picker("Gemini voice", selection: $model.geminiVoice) {
+                        ForEach(GeminiVoiceCatalog.allVoices) { voice in
+                            Text(voice.displayName)
+                                .tag(voice.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(model.geminiVoice)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(model.providerMode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            settingsSection(title: "Kokoro") {
+                TextField("Python executable", text: $model.kokoroPythonPath)
+                    .textFieldStyle(.roundedBorder)
+
+                inspectorRow(label: "Voice") {
+                    Picker("Kokoro voice", selection: $model.kokoroVoice) {
+                        ForEach(KokoroVoiceCatalog.groupedVoices, id: \.group) { group in
+                            Section(group.group) {
+                                ForEach(group.voices) { voice in
+                                    Text(voice.displayName)
+                                        .tag(voice.id)
+                                }
+                            }
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(model.kokoroVoice)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Speed")
+                        Spacer()
+                        Text(String(format: "%.2fx", model.kokoroSpeed))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $model.kokoroSpeed, in: 0.8...1.4, step: 0.05)
+                }
+
+                inspectorRow(label: "Device") {
+                    Text(model.lastKokoroDevice.isEmpty ? "Auto: prefer MPS, then CPU fallback" : model.lastKokoroDevice)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            settingsSection(title: "Storage") {
+                Picker("Location", selection: $model.saveLocationMode) {
+                    ForEach(AppModel.SaveLocationMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if model.saveLocationMode == .customFolder {
+                    Button(model.saveLocationButtonTitle) {
+                        model.chooseCustomSaveDirectory()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Text(model.customSaveDirectoryDisplay)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+
+                inspectorRow(label: "Output") {
+                    Text(model.saveLocationPreview)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                }
+
+                Text(model.saveLocationDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .cardStyle(colorScheme: colorScheme)
+    }
+
+    private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .padding(14)
+        .background(editorBackground.opacity(colorScheme == .dark ? 0.45 : 0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func inspectorRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private var editorBackground: Color {
+        Color(nsColor: .textBackgroundColor)
+    }
+
+    private var chipBackground: Color {
+        Color(nsColor: .controlBackgroundColor)
+    }
+
+    private var borderColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08)
+    }
+}
+
+private extension View {
+    func cardStyle(colorScheme: ColorScheme) -> some View {
+        self
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.78 : 0.95))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08), lineWidth: 1)
+            )
+    }
+}
