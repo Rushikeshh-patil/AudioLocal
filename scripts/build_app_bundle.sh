@@ -7,6 +7,7 @@ APP_VERSION="${1:-${APP_VERSION:-1.0.0}}"
 APP_BUILD_NUMBER="${2:-${APP_BUILD_NUMBER:-1}}"
 TARGET_ARCH="${3:-${TARGET_ARCH:-$(uname -m)}}"
 OUTPUT_APP_BUNDLE="${OUTPUT_APP_BUNDLE:-$REPO_ROOT/dist/$APP_NAME.app}"
+INCLUDE_BUNDLED_KOKORO="${INCLUDE_BUNDLED_KOKORO:-1}"
 APP_BUNDLE="$OUTPUT_APP_BUNDLE"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -60,6 +61,9 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 ditto "$EXECUTABLE_PATH" "$MACOS_DIR/$APP_NAME"
 ditto "$RESOURCE_BUNDLE_SOURCE" "$RESOURCES_DIR/$RESOURCE_BUNDLE_NAME"
 ditto "$ICON_SOURCE" "$RESOURCES_DIR/AudioLocal.icns"
+if [[ "$INCLUDE_BUNDLED_KOKORO" == "1" ]]; then
+  "$REPO_ROOT/scripts/bundle_kokoro_runtime.sh" "$RESOURCES_DIR/KokoroRuntime"
+fi
 ln -s "Contents/Resources/$RESOURCE_BUNDLE_NAME" "$APP_BUNDLE/$RESOURCE_BUNDLE_NAME"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
@@ -104,3 +108,8 @@ echo
 echo "Built $APP_BUNDLE"
 echo "Version: $APP_VERSION ($APP_BUILD_NUMBER)"
 echo "Architecture: $TARGET_ARCH"
+if [[ "$INCLUDE_BUNDLED_KOKORO" == "1" ]]; then
+  echo "Bundled Kokoro runtime: yes"
+else
+  echo "Bundled Kokoro runtime: no"
+fi

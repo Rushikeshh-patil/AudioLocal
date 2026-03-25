@@ -4,31 +4,31 @@ import Foundation
 @MainActor
 final class AppModel: ObservableObject {
     enum ProviderMode: String, CaseIterable, Identifiable {
+        case kokoroOnly
         case automatic
         case geminiOnly
-        case kokoroOnly
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
+            case .kokoroOnly:
+                return "Kokoro only"
             case .automatic:
                 return "Automatic"
             case .geminiOnly:
                 return "Gemini only"
-            case .kokoroOnly:
-                return "Kokoro only"
             }
         }
 
         var detail: String {
             switch self {
+            case .kokoroOnly:
+                return "Use the bundled local Kokoro runtime only. No Gemini API key is required."
             case .automatic:
-                return "Gemini first, then Kokoro if quota is exhausted, Gemini times out, the API is unavailable, or the API key is missing."
+                return "Use Kokoro first. If Kokoro fails and a Gemini API key is configured, fall back to Gemini."
             case .geminiOnly:
                 return "Use Gemini and fail on any Gemini error."
-            case .kokoroOnly:
-                return "Use the local Kokoro Python environment only."
             }
         }
     }
@@ -121,11 +121,11 @@ final class AppModel: ObservableObject {
     init() {
         articleTitle = defaults.string(forKey: Keys.articleTitle) ?? ""
         articleBody = defaults.string(forKey: Keys.articleBody) ?? ""
-        providerMode = ProviderMode(rawValue: defaults.string(forKey: Keys.providerMode) ?? "") ?? .automatic
+        providerMode = ProviderMode(rawValue: defaults.string(forKey: Keys.providerMode) ?? "") ?? .kokoroOnly
         geminiAPIKey = (try? keychain.read(account: "gemini_api_key")) ?? ""
         geminiModel = defaults.string(forKey: Keys.geminiModel) ?? "gemini-2.5-flash-preview-tts"
         geminiVoice = defaults.string(forKey: Keys.geminiVoice) ?? "Kore"
-        kokoroPythonPath = Self.resolveKokoroPythonPath(defaults: defaults)
+        kokoroPythonPath = Self.resolveKokoroPythonPath(defaults: defaults, bundle: .main)
         kokoroVoice = defaults.string(forKey: Keys.kokoroVoice) ?? "af_heart"
         let storedSpeed = defaults.object(forKey: Keys.kokoroSpeed) as? Double
         kokoroSpeed = storedSpeed ?? 1.0
@@ -254,12 +254,14 @@ final class AppModel: ObservableObject {
 
     private func synthesizeAutomatically() async throws -> GeneratedAudio {
         do {
-            return try await synthesizeWithGemini()
-        } catch let error as GeminiTTSClient.ClientError where error.shouldFallbackToLocal {
-            statusMessage = "Gemini unavailable for this request. Falling back to Kokoro..."
             return try await synthesizeWithKokoro()
         } catch {
-            throw error
+            guard !geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw error
+            }
+
+            statusMessage = "Kokoro unavailable for this request. Falling back to Gemini..."
+            return try await synthesizeWithGemini()
         }
     }
 
@@ -336,7 +338,12 @@ final class AppModel: ObservableObject {
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 
-    private static func resolveKokoroPythonPath(defaults: UserDefaults) -> String {
+    private static func resolveKokoroPythonPath(defaults: UserDefaults, bundle: Bundle) -> String {
+        if let bundledPath = detectBundledKokoroPythonPath(bundle: bundle) {
+            defaults.set(bundledPath, forKey: Keys.kokoroPythonPath)
+            return bundledPath
+        }
+
         let savedPath = defaults.string(forKey: Keys.kokoroPythonPath)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackPath = (savedPath?.isEmpty == false ? savedPath! : "/usr/bin/python3")
@@ -351,6 +358,21 @@ final class AppModel: ObservableObject {
         }
 
         return fallbackPath
+    }
+
+    private static func detectBundledKokoroPythonPath(bundle: Bundle) -> String? {
+        let fileManager = FileManager.default
+        guard let resourcesURL = bundle.resourceURL else {
+            return nil
+        }
+
+        let candidate = resourcesURL
+            .appendingPathComponent("KokoroRuntime", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent("python3")
+            .path
+
+        return fileManager.isExecutableFile(atPath: candidate) ? candidate : nil
     }
 
     private static func detectLocalKokoroPythonPath() -> String? {

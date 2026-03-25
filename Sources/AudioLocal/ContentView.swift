@@ -63,6 +63,10 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 360)
+
+                Text(model.providerMode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             HStack(alignment: .center, spacing: 12) {
@@ -145,35 +149,7 @@ struct ContentView: View {
             Text("Settings")
                 .font(.headline)
 
-            settingsSection(title: "Gemini") {
-                SecureField("Gemini API key", text: $model.geminiAPIKey)
-                    .textFieldStyle(.roundedBorder)
-
-                inspectorRow(label: "Model") {
-                    TextField("Gemini model", text: $model.geminiModel)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                inspectorRow(label: "Voice") {
-                    Picker("Gemini voice", selection: $model.geminiVoice) {
-                        ForEach(GeminiVoiceCatalog.allVoices) { voice in
-                            Text(voice.displayName)
-                                .tag(voice.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Text(model.geminiVoice)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(model.providerMode.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            settingsSection(title: "Kokoro") {
+            settingsSection(title: "Kokoro (Default)") {
                 TextField("Python executable", text: $model.kokoroPythonPath)
                     .textFieldStyle(.roundedBorder)
 
@@ -208,6 +184,30 @@ struct ContentView: View {
 
                 inspectorRow(label: "Device") {
                     Text(model.lastKokoroDevice.isEmpty ? "Auto: prefer MPS, then CPU fallback" : model.lastKokoroDevice)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            settingsSection(title: "Gemini (Optional)") {
+                SecureField("Gemini API key", text: $model.geminiAPIKey)
+                    .textFieldStyle(.roundedBorder)
+
+                inspectorRow(label: "Model") {
+                    TextField("Gemini model", text: $model.geminiModel)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                inspectorRow(label: "Voice") {
+                    Picker("Gemini voice", selection: $model.geminiVoice) {
+                        ForEach(GeminiVoiceCatalog.allVoices) { voice in
+                            Text(voice.displayName)
+                                .tag(voice.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(model.geminiVoice)
+                        .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }
             }

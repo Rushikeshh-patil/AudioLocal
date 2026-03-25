@@ -76,6 +76,9 @@ jobs:
           echo "APP_VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "APP_BUILD_NUMBER=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
+      - name: Install bundled Kokoro runtime dependencies
+        run: ./scripts/install_kokoro.sh
+
       - name: Build release artifacts
         run: ./scripts/package_release.sh "$APP_VERSION" "$APP_BUILD_NUMBER" "${{ matrix.architecture }}"
 

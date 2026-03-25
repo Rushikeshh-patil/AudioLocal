@@ -43,6 +43,10 @@ DMG_STAGE_DIR="$REPO_ROOT/dist/dmg-stage-$ARCH_LABEL"
 
 trap 'rm -rf "$DMG_STAGE_DIR"' EXIT
 
+if [[ "${INCLUDE_BUNDLED_KOKORO:-1}" == "1" && ( ! -x "$REPO_ROOT/.venv-kokoro/bin/python3" || ! -d "$REPO_ROOT/.kokoro-cache/huggingface/hub/models--hexgrad--Kokoro-82M" ) ]]; then
+  "$REPO_ROOT/scripts/install_kokoro.sh"
+fi
+
 OUTPUT_APP_BUNDLE="$APP_BUNDLE" "$REPO_ROOT/scripts/build_app_bundle.sh" "$APP_VERSION" "$APP_BUILD_NUMBER" "$TARGET_ARCH"
 
 rm -f "$ZIP_PATH" "$ZIP_PATH.sha256" "$DMG_PATH" "$DMG_PATH.sha256"

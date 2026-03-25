@@ -18,8 +18,9 @@ If the default SMB volume is not mounted, the app tries to open `smb://100.73.8.
 
 - Native SwiftUI macOS UI
 - Title + article text input
+- Kokoro-first local generation by default
 - Gemini TTS via the Gemini API
-- Automatic fallback to Kokoro when Gemini quota is exhausted
+- Gemini is optional instead of required
 - Switchable save target: Audiobookshelf Inbox or any custom folder
 - Saves the final file as AAC `.m4b`
 - Reveals the generated file in Finder
@@ -43,6 +44,8 @@ For a normal installed macOS app with a bundle identifier, use:
 open /Applications/AudioLocal.app
 ```
 
+`install_app.sh` now bundles the Kokoro runtime and prefetched model cache into the app so the installed `.app` can run locally without asking end users to install Python, Torch, or Kokoro separately.
+
 ## Save locations
 
 AudioLocal supports two save modes:
@@ -53,6 +56,21 @@ AudioLocal supports two save modes:
 `/chosen/path/my-article-20260325-141500/my-article-20260325-141500.m4b`
 
 The app stages the audio locally first, compresses it to AAC `.m4b`, and only then copies the final file to the destination. That keeps the UI responsive even when the final location is on a slow network share.
+
+## Default runtime
+
+AudioLocal now defaults to `Kokoro only`.
+
+- Kokoro is bundled into the packaged app and works offline by default.
+- Gemini is optional. Users only need to enter a Gemini API key if they want to switch to `Gemini only` or `Automatic`.
+
+The packaged app includes:
+
+- a bundled Python runtime
+- the Kokoro Python packages
+- the prefetched `hexgrad/Kokoro-82M` model cache
+
+That makes the GitHub downloads significantly larger, but it keeps installation to a normal drag-and-drop app install.
 
 ## Gemini setup
 
@@ -70,21 +88,13 @@ The Kokoro fallback uses the official Python package through a bundled helper sc
 ./scripts/install_kokoro.sh
 ```
 
-The installer automatically prefers Python 3.12 / 3.11 / 3.10 and will fail fast if only Python 3.9 or older is available.
+The installer automatically prefers Python 3.12 / 3.11 / 3.10 and will fail fast if only Python 3.9 or older is available. It also prefetched the Kokoro model into `.kokoro-cache/huggingface` so release builds can bundle it.
 
-Then set the Kokoro Python path inside the app to:
+For local development, the Kokoro Python path is:
 
 `/Users/rushikeshpatil/dev/audio_local/.venv-kokoro/bin/python3`
 
-The first Kokoro run downloads the model weights and English language assets, so expect an initial one-time download.
-
 On Apple Silicon, the Kokoro helper now prefers the Apple GPU through PyTorch `mps` automatically and falls back to CPU if a required operation is unsupported.
-
-If Kokoro needs phoneme support on your machine, install `espeak-ng`:
-
-```bash
-brew install espeak-ng
-```
 
 Official reference used for the helper:
 
@@ -122,15 +132,14 @@ That produces:
 - `dist/AudioLocal-macOS-intel-1.0.0.dmg`
 - matching `.sha256` checksum files
 
-The included GitHub Actions workflow at `.github/workflows/release.yml` now builds both Apple Silicon and Intel artifacts automatically on `v*` tags and attaches them to the GitHub release.
+The included GitHub Actions workflow at `.github/workflows/release.yml` now installs Kokoro, bundles it into the app, builds both Apple Silicon and Intel artifacts automatically on `v*` tags, and attaches them to the GitHub release.
 
 ## Open-source notes
 
 The repository now includes an `MIT` license in `LICENSE`.
 
-Two things are still important before publishing publicly:
+One thing is still important before publishing publicly:
 
-- The downloadable app works as a normal macOS app for Gemini, but Kokoro is not fully self-contained yet. Users still need the local Kokoro Python runtime from `./scripts/install_kokoro.sh` if they want offline fallback.
 - Intel Macs are supported by the separate Intel build, but Kokoro runs on CPU there because Apple `mps` acceleration is Apple Silicon only.
 
 Also note that GitHub release builds are not notarized yet. macOS users will likely need to right-click the app and choose `Open` the first time unless you later add Apple Developer ID signing and notarization.

@@ -4,4 +4,5 @@
 .idea
 .vscode
 .venv-kokoro*
+.kokoro-cache*
 dist/

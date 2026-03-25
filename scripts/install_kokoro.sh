@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
+export HF_HOME="$REPO_ROOT/.kokoro-cache/huggingface"
+export HF_HUB_CACHE="$HF_HOME/hub"
 
 pick_python() {
   for candidate in python3.12 python3.11 python3.10 python3; do
@@ -35,10 +37,17 @@ source .venv-kokoro/bin/activate
 python -m pip install --upgrade pip
 python -m pip install "kokoro>=0.9.4" soundfile numpy
 
+python - <<'PY'
+from huggingface_hub import snapshot_download
+
+snapshot_download(repo_id="hexgrad/Kokoro-82M")
+PY
+
 echo
 echo "Kokoro environment created."
 echo "Use this Python path in the app:"
 echo "  $REPO_ROOT/.venv-kokoro/bin/python3"
+echo "Bundled model cache:"
+echo "  $HF_HUB_CACHE/models--hexgrad--Kokoro-82M"
 echo
-echo "If phoneme generation fails, install espeak-ng with:"
-echo "  brew install espeak-ng"
+echo "The model has been prefetched into the repo-local cache so packaged apps can run offline."
