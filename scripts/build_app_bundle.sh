@@ -35,6 +35,19 @@ normalize_arch() {
 
 TARGET_ARCH="$(normalize_arch "$TARGET_ARCH")"
 
+if [[ -z "${INCLUDE_BUNDLED_VOXTRAL+x}" ]]; then
+  if [[ "$TARGET_ARCH" == "arm64" ]]; then
+    INCLUDE_BUNDLED_VOXTRAL=1
+  else
+    INCLUDE_BUNDLED_VOXTRAL=0
+  fi
+fi
+
+if [[ "$TARGET_ARCH" != "arm64" && "$INCLUDE_BUNDLED_VOXTRAL" == "1" ]]; then
+  echo "Skipping bundled Voxtral MLX runtime for $TARGET_ARCH." >&2
+  INCLUDE_BUNDLED_VOXTRAL=0
+fi
+
 cd "$REPO_ROOT"
 
 swift build -c release --arch "$TARGET_ARCH"
@@ -63,6 +76,9 @@ ditto "$RESOURCE_BUNDLE_SOURCE" "$RESOURCES_DIR/$RESOURCE_BUNDLE_NAME"
 ditto "$ICON_SOURCE" "$RESOURCES_DIR/AudioLocal.icns"
 if [[ "$INCLUDE_BUNDLED_KOKORO" == "1" ]]; then
   "$REPO_ROOT/scripts/bundle_kokoro_runtime.sh" "$RESOURCES_DIR/KokoroRuntime"
+fi
+if [[ "$INCLUDE_BUNDLED_VOXTRAL" == "1" ]]; then
+  "$REPO_ROOT/scripts/bundle_voxtral_runtime.sh" "$RESOURCES_DIR/VoxtralRuntime"
 fi
 ln -s "Contents/Resources/$RESOURCE_BUNDLE_NAME" "$APP_BUNDLE/$RESOURCE_BUNDLE_NAME"
 
@@ -112,4 +128,9 @@ if [[ "$INCLUDE_BUNDLED_KOKORO" == "1" ]]; then
   echo "Bundled Kokoro runtime: yes"
 else
   echo "Bundled Kokoro runtime: no"
+fi
+if [[ "$INCLUDE_BUNDLED_VOXTRAL" == "1" ]]; then
+  echo "Bundled Voxtral MLX runtime: yes"
+else
+  echo "Bundled Voxtral MLX runtime: no"
 fi

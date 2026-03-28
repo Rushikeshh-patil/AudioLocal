@@ -38,7 +38,7 @@ enum WAVEncoder {
         return nil
     }
 
-    private static func makeWAV(
+    static func makeWAV(
         pcmData: Data,
         sampleRate: Int,
         channels: Int,

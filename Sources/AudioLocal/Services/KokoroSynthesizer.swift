@@ -1,5 +1,38 @@
 import Foundation
 
+private final class KokoroPipeCapture: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "AudioLocal.KokoroPipeCapture")
+    private var stdoutData = Data()
+    private var stderrData = Data()
+
+    func appendStdout(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        queue.sync {
+            stdoutData.append(chunk)
+        }
+    }
+
+    func appendStderr(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        queue.sync {
+            stderrData.append(chunk)
+        }
+    }
+
+    func snapshot(appendingStdout trailingStdout: Data, stderr trailingStderr: Data) -> (stdout: Data, stderr: Data) {
+        queue.sync {
+            if !trailingStdout.isEmpty {
+                stdoutData.append(trailingStdout)
+            }
+            if !trailingStderr.isEmpty {
+                stderrData.append(trailingStderr)
+            }
+
+            return (stdoutData, stderrData)
+        }
+    }
+}
+
 struct KokoroSynthesizer {
     struct SynthesisResult {
         let audioData: Data
@@ -49,6 +82,7 @@ struct KokoroSynthesizer {
 
             let stderrPipe = Pipe()
             let stdoutPipe = Pipe()
+            let outputCapture = KokoroPipeCapture()
             let process = Process()
             process.executableURL = URL(fileURLWithPath: pythonExecutable)
             process.arguments = [
@@ -61,6 +95,26 @@ struct KokoroSynthesizer {
             process.standardError = stderrPipe
             process.standardOutput = stdoutPipe
 
+            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                guard !chunk.isEmpty else {
+                    handle.readabilityHandler = nil
+                    return
+                }
+
+                outputCapture.appendStdout(chunk)
+            }
+
+            stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                guard !chunk.isEmpty else {
+                    handle.readabilityHandler = nil
+                    return
+                }
+
+                outputCapture.appendStderr(chunk)
+            }
+
             do {
                 try process.run()
             } catch {
@@ -68,11 +122,16 @@ struct KokoroSynthesizer {
             }
 
             process.waitUntilExit()
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrText = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown error"
-            let stdoutText = String(data: stdoutData, encoding: .utf8) ?? ""
+            let trailingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            let trailingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+            let capturedOutput = outputCapture.snapshot(appendingStdout: trailingStdout, stderr: trailingStderr)
+
+            let stderrText = String(data: capturedOutput.stderr, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown error"
+            let stdoutText = String(data: capturedOutput.stdout, encoding: .utf8) ?? ""
 
             guard process.terminationStatus == 0 else {
                 throw SynthError.processFailed(stderrText)

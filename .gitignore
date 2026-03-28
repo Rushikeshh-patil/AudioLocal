@@ -4,5 +4,7 @@
 .idea
 .vscode
 .venv-kokoro*
+.venv-voxtral*
 .kokoro-cache*
+.voxtral-cache*
 dist/

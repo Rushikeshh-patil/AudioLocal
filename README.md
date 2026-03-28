@@ -18,7 +18,7 @@ If the default SMB volume is not mounted, the app tries to open `smb://100.73.8.
 
 - Native SwiftUI macOS UI
 - Title + article text input
-- Kokoro-first local generation by default
+- Selectable local TTS engines: Kokoro or Voxtral MLX
 - Gemini TTS via the Gemini API
 - Gemini is optional instead of required
 - Switchable save target: Audiobookshelf Inbox or any custom folder
@@ -46,6 +46,8 @@ open /Applications/AudioLocal.app
 
 `install_app.sh` now bundles the Kokoro runtime and prefetched model cache into the app so the installed `.app` can run locally without asking end users to install Python, Torch, or Kokoro separately.
 
+On Apple Silicon, `install_app.sh` also bundles the Voxtral MLX runtime by default, but not the Voxtral model weights. Those are downloaded separately into a user cache outside the app bundle.
+
 ## Save locations
 
 AudioLocal supports two save modes:
@@ -59,9 +61,11 @@ The app stages the audio locally first, exports it in the selected format, and o
 
 ## Default runtime
 
-AudioLocal now defaults to `Kokoro only`.
+AudioLocal now defaults to `Local only`, with `Kokoro` selected as the default local model.
 
 - Kokoro is bundled into the packaged app and works offline by default.
+- Voxtral MLX is optional and available on Apple Silicon builds.
+- The Voxtral model weights are kept separate from the installer and are downloaded into a user cache when needed.
 - Gemini is optional. Users only need to enter a Gemini API key if they want to switch to `Gemini only` or `Automatic`.
 
 The packaged app includes:
@@ -69,6 +73,7 @@ The packaged app includes:
 - a bundled Python runtime
 - the Kokoro Python packages
 - the prefetched `hexgrad/Kokoro-82M` model cache
+- on Apple Silicon, the MLX Voxtral Python packages
 
 That makes the GitHub downloads significantly larger, but it keeps installation to a normal drag-and-drop app install.
 
@@ -99,6 +104,48 @@ On Apple Silicon, the Kokoro helper now prefers the Apple GPU through PyTorch `m
 Official reference used for the helper:
 
 - [Kokoro README](https://github.com/hexgrad/kokoro)
+
+## Voxtral MLX setup
+
+Voxtral MLX is an optional local model for Apple Silicon Macs. Create its local Python environment with:
+
+```bash
+./scripts/install_voxtral_mlx.sh
+```
+
+The runtime installer currently pulls `mlx-audio` from GitHub rather than PyPI because Voxtral support is still moving quickly.
+
+The installer also pulls `tiktoken`, which Voxtral currently needs for its Tekken tokenizer.
+
+Download the model separately with:
+
+```bash
+./scripts/pull_voxtral_mlx_model.sh
+```
+
+For local development, the Voxtral Python path is:
+
+`/Users/rushikeshpatil/dev/audio_local/.venv-voxtral/bin/python3`
+
+The default model ID in the app is:
+
+`mlx-community/Voxtral-4B-TTS-2603-mlx-bf16`
+
+The model download script stores Voxtral in:
+
+`~/Library/Application Support/AudioLocal/VoxtralModels/huggingface`
+
+That keeps the app installer lightweight while still letting the installed app reuse the same shared model cache.
+
+As of March 27, 2026, local Voxtral MLX works on this project when the runtime is refreshed from the current `mlx-audio` GitHub build. Some older installs still report `mlx-audio 0.4.1` while missing the `voxtral_tts` loader, so re-run `./scripts/install_voxtral_mlx.sh` if the app reports a runtime mismatch.
+
+The linked bf16 model fits on Apple Silicon machines like this `24 GB` M4 Mac, but it is still slow. The MLX model card lists the bf16 variant at about `~8 GB` and roughly `6.50x` short-form real-time factor on Apple Silicon, so it is better suited to offline narration than quick interactive playback.
+
+References used for the helper:
+
+- [mlx-audio](https://github.com/Blaizzy/mlx-audio)
+- [Voxtral 4B TTS model card](https://huggingface.co/mistralai/Voxtral-4B-TTS-2603)
+- [MLX Voxtral model card](https://huggingface.co/mlx-community/Voxtral-4B-TTS-2603-mlx-bf16)
 
 ## Packaging and GitHub releases
 
@@ -132,7 +179,7 @@ That produces:
 - `dist/AudioLocal-macOS-intel-1.0.0.dmg`
 - matching `.sha256` checksum files
 
-The included GitHub Actions workflow at `.github/workflows/release.yml` now installs Kokoro, bundles it into the app, builds both Apple Silicon and Intel artifacts automatically on `v*` tags, and attaches them to the GitHub release.
+The included GitHub Actions workflow at `.github/workflows/release.yml` now installs Kokoro, can bundle Voxtral MLX for Apple Silicon builds, builds both Apple Silicon and Intel artifacts automatically on `v*` tags, and attaches them to the GitHub release.
 
 ## Open-source notes
 
@@ -141,5 +188,6 @@ The repository now includes an `MIT` license in `LICENSE`.
 One thing is still important before publishing publicly:
 
 - Intel Macs are supported by the separate Intel build, but Kokoro runs on CPU there because Apple `mps` acceleration is Apple Silicon only.
+- Voxtral MLX is Apple Silicon only and uses the `CC BY-NC 4.0` license inherited from the released voice references.
 
 Also note that GitHub release builds are not notarized yet. macOS users will likely need to right-click the app and choose `Open` the first time unless you later add Apple Developer ID signing and notarization.

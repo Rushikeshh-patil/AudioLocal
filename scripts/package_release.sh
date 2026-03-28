@@ -41,10 +41,22 @@ ZIP_PATH="$REPO_ROOT/dist/${APP_NAME}-macOS-$ARCH_LABEL-$SAFE_VERSION.zip"
 DMG_PATH="$REPO_ROOT/dist/${APP_NAME}-macOS-$ARCH_LABEL-$SAFE_VERSION.dmg"
 DMG_STAGE_DIR="$REPO_ROOT/dist/dmg-stage-$ARCH_LABEL"
 
+if [[ -z "${INCLUDE_BUNDLED_VOXTRAL+x}" ]]; then
+  if [[ "$TARGET_ARCH" == "arm64" ]]; then
+    INCLUDE_BUNDLED_VOXTRAL=1
+  else
+    INCLUDE_BUNDLED_VOXTRAL=0
+  fi
+fi
+
 trap 'rm -rf "$DMG_STAGE_DIR"' EXIT
 
 if [[ "${INCLUDE_BUNDLED_KOKORO:-1}" == "1" && ( ! -x "$REPO_ROOT/.venv-kokoro/bin/python3" || ! -d "$REPO_ROOT/.kokoro-cache/huggingface/hub/models--hexgrad--Kokoro-82M" ) ]]; then
   "$REPO_ROOT/scripts/install_kokoro.sh"
+fi
+
+if [[ "$INCLUDE_BUNDLED_VOXTRAL" == "1" && "$TARGET_ARCH" == "arm64" && ! -x "$REPO_ROOT/.venv-voxtral/bin/python3" ]]; then
+  "$REPO_ROOT/scripts/install_voxtral_mlx.sh"
 fi
 
 OUTPUT_APP_BUNDLE="$APP_BUNDLE" "$REPO_ROOT/scripts/build_app_bundle.sh" "$APP_VERSION" "$APP_BUILD_NUMBER" "$TARGET_ARCH"

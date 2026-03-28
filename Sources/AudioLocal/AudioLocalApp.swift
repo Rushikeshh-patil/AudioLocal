@@ -7,7 +7,7 @@ struct AudioLocalApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
-                .frame(minWidth: 1180, minHeight: 760)
+                .frame(minWidth: 980, minHeight: 720)
         }
     }
 }

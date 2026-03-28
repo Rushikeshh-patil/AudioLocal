@@ -74,6 +74,8 @@ struct AudioTranscoder: Sendable {
                 "-b", "48000",
                 "-q", "127",
                 "-s", "3",
+                // Recent afconvert builds require SoundCheck metadata when setting media kind.
+                "--soundcheck-generate",
                 "--media-kind", "Audiobook"
             ]
         case .m4a:

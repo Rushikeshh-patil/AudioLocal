@@ -1,10 +1,13 @@
 #!/bin/zsh
 set -euo pipefail
 
+if [[ "$(uname -m)" != "arm64" ]]; then
+  echo "Voxtral MLX requires Apple Silicon." >&2
+  exit 1
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
-export HF_HOME="$REPO_ROOT/.kokoro-cache/huggingface"
-export HF_HUB_CACHE="$HF_HOME/hub"
 
 sign_native_extensions() {
   local root="$1"
@@ -38,25 +41,17 @@ PY
 
 PYTHON_BIN="$(pick_python)"
 
-"$PYTHON_BIN" -m venv .venv-kokoro
-source .venv-kokoro/bin/activate
+"$PYTHON_BIN" -m venv .venv-voxtral
+source .venv-voxtral/bin/activate
 
 python -m pip install --upgrade pip
-python -m pip install "kokoro>=0.9.4" soundfile numpy
-
-python - <<'PY'
-from huggingface_hub import snapshot_download
-
-snapshot_download(repo_id="hexgrad/Kokoro-82M")
-PY
-
-sign_native_extensions "$REPO_ROOT/.venv-kokoro/lib"
+python -m pip install --upgrade --force-reinstall "git+https://github.com/Blaizzy/mlx-audio.git" soundfile numpy tiktoken
+sign_native_extensions "$REPO_ROOT/.venv-voxtral/lib"
 
 echo
-echo "Kokoro environment created."
+echo "Voxtral MLX runtime created."
 echo "Use this Python path in the app:"
-echo "  $REPO_ROOT/.venv-kokoro/bin/python3"
-echo "Bundled model cache:"
-echo "  $HF_HUB_CACHE/models--hexgrad--Kokoro-82M"
+echo "  $REPO_ROOT/.venv-voxtral/bin/python3"
 echo
-echo "The model has been prefetched into the repo-local cache so packaged apps can run offline."
+echo "Download the model separately with:"
+echo "  ./scripts/pull_voxtral_mlx_model.sh"
