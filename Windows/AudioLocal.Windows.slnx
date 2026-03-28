@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AudioLocal.Windows.Core/AudioLocal.Windows.Core.csproj" />
+    <Project Path="src/AudioLocal.Windows/AudioLocal.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AudioLocal.Windows.Core.Tests/AudioLocal.Windows.Core.Tests.csproj" />
+  </Folder>
+</Solution>

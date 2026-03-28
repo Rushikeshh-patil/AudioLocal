@@ -1,0 +1,312 @@
+<Window
+    x:Class="AudioLocal.Windows.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="AudioLocal for Windows">
+
+    <Grid x:Name="RootGrid" Padding="20" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="AudioLocal" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{Binding HeaderSubtitle}"
+                    TextWrapping="WrapWholeWords" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding LastBackendLabel}" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{Binding LastDeviceLabel}" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                <Button Content="Import EPUB" Click="OnImportEpubClick" />
+                <Button Content="Clear Book" Click="OnClearBookClick" IsEnabled="{Binding CanClearBook}" />
+                <Button Content="Generate Current" Click="OnGenerateCurrentClick" IsEnabled="{Binding CanGenerateCurrent}" />
+                <Button
+                    Content="Generate Full Book"
+                    Click="OnGenerateFullClick"
+                    IsEnabled="{Binding CanGenerateFullBook}"
+                    Visibility="{Binding GenerateFullVisibility}" />
+                <Button Content="Reveal File" Click="OnRevealLastFileClick" IsEnabled="{Binding CanRevealLastFile}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="1" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Border
+                    BorderBrush="{ThemeResource TextFillColorDisabledBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16"
+                    Visibility="{Binding ArticleWorkspaceVisibility}">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Article Workspace" FontSize="20" FontWeight="SemiBold" />
+                            <TextBox Header="Title" PlaceholderText="Article title" Text="{Binding ArticleTitle, Mode=TwoWay}" />
+                        </StackPanel>
+
+                        <TextBox
+                            Grid.Row="1"
+                            AcceptsReturn="True"
+                            Header="Text"
+                            PlaceholderText="Paste article text here."
+                            ScrollViewer.VerticalScrollBarVisibility="Auto"
+                            Text="{Binding ArticleBody, Mode=TwoWay}"
+                            TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+
+                <Grid Visibility="{Binding BookWorkspaceVisibility}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            BorderBrush="{ThemeResource TextFillColorDisabledBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16">
+                            <Grid RowSpacing="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Chapters" FontSize="20" FontWeight="SemiBold" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding ImportedBookSummary}" />
+                                </StackPanel>
+
+                                <ListView
+                                    Grid.Row="1"
+                                    ItemsSource="{Binding ImportedChapters}"
+                                    SelectedItem="{Binding SelectedChapter, Mode=TwoWay}">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="4" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay}" VerticalAlignment="Top" />
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="WrapWholeWords" />
+                                                    <TextBlock
+                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                        Text="{Binding SourcePath}"
+                                                        TextWrapping="WrapWholeWords" />
+                                                    <TextBlock
+                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                        Text="{Binding WordCount}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Grid.Column="2"
+                            BorderBrush="{ThemeResource TextFillColorDisabledBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16">
+                            <Grid RowSpacing="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="{Binding SelectedChapterHeading}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding SelectedChapterDetail}" />
+                                </StackPanel>
+
+                                <TextBox
+                                    Grid.Row="1"
+                                    AcceptsReturn="True"
+                                    PlaceholderText="Select a chapter to review or edit it."
+                                    ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                    Text="{Binding SelectedChapterText, Mode=TwoWay}"
+                                    TextWrapping="Wrap" />
+
+                                <Button
+                                    Grid.Row="2"
+                                    Click="OnRevertSelectedChapterClick"
+                                    Content="Revert Selected Chapter"
+                                    HorizontalAlignment="Left" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Column="1" />
+
+            <Border
+                Grid.Column="2"
+                BorderBrush="{ThemeResource TextFillColorDisabledBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16">
+                <ScrollViewer>
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold" />
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Generation" FontWeight="SemiBold" />
+                            <ComboBox
+                                Header="Mode"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{Binding ProviderOptions}"
+                                SelectedValue="{Binding SelectedProviderMode, Mode=TwoWay}"
+                                SelectedValuePath="Value" />
+                            <ComboBox
+                                Header="Acceleration"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{Binding AccelerationOptions}"
+                                SelectedValue="{Binding SelectedAccelerationMode, Mode=TwoWay}"
+                                SelectedValuePath="Value" />
+                            <ComboBox
+                                Header="Kokoro voice"
+                                DisplayMemberPath="DisplayName"
+                                ItemsSource="{Binding KokoroVoices}"
+                                SelectedValue="{Binding KokoroVoice, Mode=TwoWay}"
+                                SelectedValuePath="Id" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{Binding KokoroVoice}" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Speed" />
+                                <Slider
+                                    Maximum="1.4"
+                                    Minimum="0.8"
+                                    StepFrequency="0.05"
+                                    Value="{Binding KokoroSpeed, Mode=TwoWay}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Gemini (Optional)" FontWeight="SemiBold" />
+                            <PasswordBox x:Name="GeminiApiKeyBox" Header="API key" PasswordChanged="OnGeminiApiKeyChanged" />
+                            <TextBox Header="Model" Text="{Binding GeminiModel, Mode=TwoWay}" />
+                            <ComboBox
+                                Header="Voice"
+                                DisplayMemberPath="DisplayName"
+                                ItemsSource="{Binding GeminiVoices}"
+                                SelectedValue="{Binding GeminiVoice, Mode=TwoWay}"
+                                SelectedValuePath="Id" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Storage" FontWeight="SemiBold" />
+                            <ComboBox
+                                Header="Location"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{Binding SaveLocationOptions}"
+                                SelectedValue="{Binding SelectedSaveLocationMode, Mode=TwoWay}"
+                                SelectedValuePath="Value" />
+                            <ComboBox
+                                Header="Format"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{Binding ExportFormatOptions}"
+                                SelectedValue="{Binding SelectedExportFormat, Mode=TwoWay}"
+                                SelectedValuePath="Value" />
+                            <StackPanel Spacing="8" Visibility="{Binding CustomFolderVisibility}">
+                                <Button Content="Choose custom folder" Click="OnChooseFolderClick" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding CustomSaveDirectory}"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{Binding SaveLocationPreview}"
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" BorderThickness="1" Padding="16">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="520" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Spacing="8">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontWeight="SemiBold" Text="{Binding ProgressTitle}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{Binding ProgressDetail}"
+                            TextWrapping="WrapWholeWords" />
+                    </Grid>
+                    <ProgressBar
+                        IsIndeterminate="{Binding IsProgressIndeterminate}"
+                        Value="{Binding GenerationProgress}"
+                        Visibility="{Binding ProgressVisibility}" />
+                    <TextBlock Text="{Binding StatusMessage}" TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{Binding LastSavedPath}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <TextBlock Text="Conversion Telemetry" FontWeight="SemiBold" />
+                    <TextBox
+                        AcceptsReturn="True"
+                        IsReadOnly="True"
+                        MinHeight="150"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
+                        Text="{Binding GenerationTelemetry}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

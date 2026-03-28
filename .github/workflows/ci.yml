@@ -49,3 +49,23 @@ jobs:
 
       - name: Build app bundle
         run: INCLUDE_BUNDLED_KOKORO=0 INCLUDE_BUNDLED_VOXTRAL=0 ./scripts/build_app_bundle.sh 0.0.0-ci "${{ github.run_number }}" arm64
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build Windows solution
+        shell: pwsh
+        run: dotnet build .\Windows\AudioLocal.Windows.slnx -p:UseSharedCompilation=false
+
+      - name: Run Windows tests
+        shell: pwsh
+        run: dotnet test .\Windows\tests\AudioLocal.Windows.Core.Tests\AudioLocal.Windows.Core.Tests.csproj --no-build

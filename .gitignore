@@ -8,3 +8,9 @@
 .kokoro-cache*
 .voxtral-cache*
 dist/
+Windows/artifacts/
+Windows/**/bin/
+Windows/**/obj/
+Windows/installer/GeneratedFiles.wxs
+Windows/build-winui-diag.log
+Windows/*.pp.xml
